@@ -1,3 +1,4 @@
+```python
 import streamlit as st
 import pandas as pd
 import pydeck as pdk
@@ -5,9 +6,9 @@ import plotly.express as px
 from geopy.geocoders import Nominatim
 import time
 
-# ---------------------------------------------------
+# =====================================================
 # PAGE CONFIG
-# ---------------------------------------------------
+# =====================================================
 
 st.set_page_config(
     page_title="Transportation Dashboard",
@@ -16,17 +17,18 @@ st.set_page_config(
 
 st.title("🚚 Transportation Route Dashboard")
 
-# ---------------------------------------------------
+# =====================================================
 # LOAD DATA
-# ---------------------------------------------------
+# =====================================================
 
 df = pd.read_csv("transport.csv")
 
+# Clean column names
 df.columns = df.columns.str.strip()
 
-# ---------------------------------------------------
-# KPI CARDS
-# ---------------------------------------------------
+# =====================================================
+# KPI SECTION
+# =====================================================
 
 st.subheader("📌 Summary")
 
@@ -49,15 +51,15 @@ col3.metric(
 
 st.divider()
 
-# ---------------------------------------------------
-# BAR CHART
-# ---------------------------------------------------
+# =====================================================
+# TOP ROUTES CHART
+# =====================================================
 
 left, right = st.columns([1,1])
 
 with left:
 
-    st.subheader("📊 Top Routes")
+    st.subheader("📊 Top Transportation Routes")
 
     top_routes = df.sort_values(
         by="Avg Distance Per Month",
@@ -70,14 +72,15 @@ with left:
         y="Source",
         orientation="h",
         color="Avg Distance Per Month",
-        hover_data=["Destination"]
+        hover_data=["Destination"],
+        height=500
     )
 
     st.plotly_chart(fig, use_container_width=True)
 
-# ---------------------------------------------------
-# GEOCODING
-# ---------------------------------------------------
+# =====================================================
+# GEOCODER
+# =====================================================
 
 geolocator = Nominatim(user_agent="transport_dashboard")
 
@@ -97,9 +100,9 @@ def get_coordinates(place):
 
     return None, None
 
-# ---------------------------------------------------
+# =====================================================
 # CREATE MAP DATA
-# ---------------------------------------------------
+# =====================================================
 
 map_data = []
 
@@ -125,41 +128,61 @@ for _, row in df.iterrows():
 
 map_df = pd.DataFrame(map_data)
 
-# ---------------------------------------------------
+# =====================================================
 # MAP SECTION
-# ---------------------------------------------------
+# =====================================================
 
 with right:
 
-    st.subheader("🗺 Route Map")
+    st.subheader("🗺 Transportation Route Map")
 
+    # ROUTE LINES
     arc_layer = pdk.Layer(
         "ArcLayer",
         data=map_df,
 
-        get_source_position=["from_lon", "from_lat"],
-        get_target_position=["to_lon", "to_lat"],
+        get_source_position='[from_lon, from_lat]',
+        get_target_position='[to_lon, to_lat]',
 
         get_source_color=[255, 0, 0],
         get_target_color=[0, 128, 255],
 
-        get_width=3,
+        get_width=4,
+
+        pickable=True,
+        auto_highlight=True
+    )
+
+    # SOURCE POINTS
+    scatter_layer = pdk.Layer(
+        "ScatterplotLayer",
+        data=map_df,
+
+        get_position='[from_lon, from_lat]',
+
+        get_radius=50000,
+
+        get_fill_color=[255, 140, 0],
 
         pickable=True
     )
 
+    # MAP VIEW
     view_state = pdk.ViewState(
         latitude=22.5937,
         longitude=78.9629,
-        zoom=4
+        zoom=4,
+        pitch=30
     )
 
+    # DECK
     deck = pdk.Deck(
-        map_style="mapbox://styles/mapbox/light-v9",
-
         initial_view_state=view_state,
 
-        layers=[arc_layer],
+        layers=[
+            arc_layer,
+            scatter_layer
+        ],
 
         tooltip={
             "html": """
@@ -179,10 +202,11 @@ with right:
 
 st.divider()
 
-# ---------------------------------------------------
+# =====================================================
 # DATA TABLE
-# ---------------------------------------------------
+# =====================================================
 
 st.subheader("📄 Transportation Data")
 
 st.dataframe(df)
+```
