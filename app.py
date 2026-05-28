@@ -16,19 +16,16 @@ st.title("🚚 Transportation Route Dashboard")
 # ---------------- LOAD DATA ----------------
 df = pd.read_csv("transport.csv")
 
-# Clean columns
+# Clean column names
 df.columns = df.columns.str.strip()
 
-# ---------------- KPI CARDS ----------------
+# ---------------- KPI SECTION ----------------
 col1, col2, col3 = st.columns(3)
 
-col1.metric(
-    "Total Routes",
-    len(df)
-)
+col1.metric("Total Routes", len(df))
 
 col2.metric(
-    "Total Avg Distance",
+    "Total Distance",
     int(df["Avg Distance Per Month"].sum())
 )
 
@@ -37,8 +34,8 @@ col3.metric(
     int(df["Avg Distance Per Month"].max())
 )
 
-# ---------------- TOP ROUTES ----------------
-st.subheader("📊 Top Routes")
+# ---------------- BAR CHART ----------------
+st.subheader("📊 Top Transportation Routes")
 
 top_routes = df.sort_values(
     by="Avg Distance Per Month",
@@ -64,69 +61,78 @@ geolocator = Nominatim(user_agent="transport_dashboard")
 def get_coordinates(place):
 
     try:
-        location = geolocator.geocode(place + ", India")
+        location = geolocator.geocode(place)
 
         time.sleep(1)
 
         if location:
-            return [location.longitude, location.latitude]
+            return location.latitude, location.longitude
 
     except:
         pass
 
-    return None
+    return None, None
 
-# ---------------- COORDINATES ----------------
-paths = []
+# ---------------- CREATE MAP DATA ----------------
+map_data = []
 
 for _, row in df.iterrows():
 
-    source = get_coordinates(row["Source"])
-    destination = get_coordinates(row["Destination"])
+    s_lat, s_lon = get_coordinates(row["Source"])
+    d_lat, d_lon = get_coordinates(row["Destination"])
 
-    if source and destination:
+    if None not in [s_lat, s_lon, d_lat, d_lon]:
 
-        paths.append({
-            "path": [source, destination],
-            "distance": row["Avg Distance Per Month"],
-            "source": row["Source"],
-            "destination": row["Destination"]
+        map_data.append({
+            "from_name": row["Source"],
+            "to_name": row["Destination"],
+
+            "from_lat": s_lat,
+            "from_lon": s_lon,
+
+            "to_lat": d_lat,
+            "to_lon": d_lon,
+
+            "distance": row["Avg Distance Per Month"]
         })
 
-# ---------------- MAP LAYER ----------------
-path_layer = pdk.Layer(
-    "PathLayer",
-    data=paths,
+map_df = pd.DataFrame(map_data)
 
-    get_path="path",
+# ---------------- ARC LAYER ----------------
+arc_layer = pdk.Layer(
+    "ArcLayer",
+    data=map_df,
 
-    get_width=5,
+    get_source_position=["from_lon", "from_lat"],
+    get_target_position=["to_lon", "to_lat"],
 
-    get_color="[255, 0, 0]",
+    get_source_color=[255, 0, 0],
+    get_target_color=[0, 128, 255],
 
-    width_min_pixels=2,
+    get_width=3,
 
-    pickable=True
+    pickable=True,
+    auto_highlight=True
 )
 
 # ---------------- VIEW ----------------
 view_state = pdk.ViewState(
-    latitude=22.5,
-    longitude=80,
+    latitude=22.5937,
+    longitude=78.9629,
     zoom=4,
-    pitch=0
+    pitch=30
 )
 
 # ---------------- TOOLTIP ----------------
 tooltip = {
     "html": """
-    <b>Source:</b> {source}<br/>
-    <b>Destination:</b> {destination}<br/>
+    <b>Source:</b> {from_name}<br/>
+    <b>Destination:</b> {to_name}<br/>
     <b>Distance:</b> {distance} KM
     """,
 
     "style": {
-        "backgroundColor": "black",
+        "backgroundColor": "steelblue",
         "color": "white"
     }
 }
@@ -137,13 +143,13 @@ deck = pdk.Deck(
 
     initial_view_state=view_state,
 
-    layers=[path_layer],
+    layers=[arc_layer],
 
     tooltip=tooltip
 )
 
 # ---------------- SHOW MAP ----------------
-st.subheader("🗺 Transportation Route Map")
+st.subheader("🗺 Route Map")
 
 st.pydeck_chart(deck)
 
