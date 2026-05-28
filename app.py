@@ -5,7 +5,10 @@ import plotly.express as px
 from geopy.geocoders import Nominatim
 import time
 
-# ---------------- PAGE CONFIG ----------------
+# ---------------------------------------------------
+# PAGE CONFIG
+# ---------------------------------------------------
+
 st.set_page_config(
     page_title="Transportation Dashboard",
     layout="wide"
@@ -13,19 +16,29 @@ st.set_page_config(
 
 st.title("🚚 Transportation Route Dashboard")
 
-# ---------------- LOAD DATA ----------------
+# ---------------------------------------------------
+# LOAD DATA
+# ---------------------------------------------------
+
 df = pd.read_csv("transport.csv")
 
-# Clean column names
 df.columns = df.columns.str.strip()
 
-# ---------------- KPI SECTION ----------------
+# ---------------------------------------------------
+# KPI CARDS
+# ---------------------------------------------------
+
+st.subheader("📌 Summary")
+
 col1, col2, col3 = st.columns(3)
 
-col1.metric("Total Routes", len(df))
+col1.metric(
+    "Total Routes",
+    len(df)
+)
 
 col2.metric(
-    "Total Distance",
+    "Total Avg Distance",
     int(df["Avg Distance Per Month"].sum())
 )
 
@@ -34,27 +47,38 @@ col3.metric(
     int(df["Avg Distance Per Month"].max())
 )
 
-# ---------------- BAR CHART ----------------
-st.subheader("📊 Top Transportation Routes")
+st.divider()
 
-top_routes = df.sort_values(
-    by="Avg Distance Per Month",
-    ascending=False
-)
+# ---------------------------------------------------
+# BAR CHART
+# ---------------------------------------------------
 
-fig = px.bar(
-    top_routes.head(10),
-    x="Avg Distance Per Month",
-    y="Source",
-    orientation="h",
-    color="Avg Distance Per Month",
-    hover_data=["Destination"],
-    height=500
-)
+left, right = st.columns([1,1])
 
-st.plotly_chart(fig, use_container_width=True)
+with left:
 
-# ---------------- GEOCODER ----------------
+    st.subheader("📊 Top Routes")
+
+    top_routes = df.sort_values(
+        by="Avg Distance Per Month",
+        ascending=False
+    )
+
+    fig = px.bar(
+        top_routes.head(10),
+        x="Avg Distance Per Month",
+        y="Source",
+        orientation="h",
+        color="Avg Distance Per Month",
+        hover_data=["Destination"]
+    )
+
+    st.plotly_chart(fig, use_container_width=True)
+
+# ---------------------------------------------------
+# GEOCODING
+# ---------------------------------------------------
+
 geolocator = Nominatim(user_agent="transport_dashboard")
 
 @st.cache_data
@@ -73,7 +97,10 @@ def get_coordinates(place):
 
     return None, None
 
-# ---------------- CREATE MAP DATA ----------------
+# ---------------------------------------------------
+# CREATE MAP DATA
+# ---------------------------------------------------
+
 map_data = []
 
 for _, row in df.iterrows():
@@ -98,62 +125,64 @@ for _, row in df.iterrows():
 
 map_df = pd.DataFrame(map_data)
 
-# ---------------- ARC LAYER ----------------
-arc_layer = pdk.Layer(
-    "ArcLayer",
-    data=map_df,
+# ---------------------------------------------------
+# MAP SECTION
+# ---------------------------------------------------
 
-    get_source_position=["from_lon", "from_lat"],
-    get_target_position=["to_lon", "to_lat"],
+with right:
 
-    get_source_color=[255, 0, 0],
-    get_target_color=[0, 128, 255],
+    st.subheader("🗺 Route Map")
 
-    get_width=3,
+    arc_layer = pdk.Layer(
+        "ArcLayer",
+        data=map_df,
 
-    pickable=True,
-    auto_highlight=True
-)
+        get_source_position=["from_lon", "from_lat"],
+        get_target_position=["to_lon", "to_lat"],
 
-# ---------------- VIEW ----------------
-view_state = pdk.ViewState(
-    latitude=22.5937,
-    longitude=78.9629,
-    zoom=4,
-    pitch=30
-)
+        get_source_color=[255, 0, 0],
+        get_target_color=[0, 128, 255],
 
-# ---------------- TOOLTIP ----------------
-tooltip = {
-    "html": """
-    <b>Source:</b> {from_name}<br/>
-    <b>Destination:</b> {to_name}<br/>
-    <b>Distance:</b> {distance} KM
-    """,
+        get_width=3,
 
-    "style": {
-        "backgroundColor": "steelblue",
-        "color": "white"
-    }
-}
+        pickable=True
+    )
 
-# ---------------- MAP ----------------
-deck = pdk.Deck(
-    map_style="mapbox://styles/mapbox/light-v9",
+    view_state = pdk.ViewState(
+        latitude=22.5937,
+        longitude=78.9629,
+        zoom=4
+    )
 
-    initial_view_state=view_state,
+    deck = pdk.Deck(
+        map_style="mapbox://styles/mapbox/light-v9",
 
-    layers=[arc_layer],
+        initial_view_state=view_state,
 
-    tooltip=tooltip
-)
+        layers=[arc_layer],
 
-# ---------------- SHOW MAP ----------------
-st.subheader("🗺 Route Map")
+        tooltip={
+            "html": """
+            <b>Source:</b> {from_name}<br/>
+            <b>Destination:</b> {to_name}<br/>
+            <b>Distance:</b> {distance} KM
+            """,
 
-st.pydeck_chart(deck)
+            "style": {
+                "backgroundColor": "black",
+                "color": "white"
+            }
+        }
+    )
 
-# ---------------- TABLE ----------------
+    st.pydeck_chart(deck)
+
+st.divider()
+
+# ---------------------------------------------------
+# DATA TABLE
+# ---------------------------------------------------
+
 st.subheader("📄 Transportation Data")
 
 st.dataframe(df)
